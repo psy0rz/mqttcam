@@ -29,29 +29,28 @@ class CamServerProtocol(asyncio.Protocol):
         camera.stop_recording()
 
 
-async def main():
-
-    # Get a reference to the event loop as we plan to use
-    # low-level APIs.
-    loop = asyncio.get_running_loop()
-    log("a")
-    server = await loop.create_server(
-        lambda: CamServerProtocol(),
-        '0.0.0.0', 3333)
-
-    # receive mqtt stuff
+async def mqtt_server():
+    # handle mqtt stuff
     will=asyncio_mqtt.Will(config.mqtt_topic+"status", "offline")
     async with asyncio_mqtt.Client(config.mqtt_server, will=will) as client:
         await client.publish(config.mqtt_topic+"status", "online")
         async with client.unfiltered_messages() as messages:
             await client.subscribe(config.mqtt_topic+"#")
-            log("hierrr")
             async for message in messages:
-                log("jo " + message.payload.decode())
+
+                if message.topic.endswith("/annotate_text"):
+                    camera.annotate_text=message.payload.decode()
 
 
-    async with server:
-        await server.serve_forever()
+async def main():
 
+    # Get a reference to the event loop as we plan to use
+    # low-level APIs.
+    loop = asyncio.get_running_loop()
+    server  = loop.create_server(
+        lambda: CamServerProtocol(),
+        '0.0.0.0', 3333)
+
+    await asyncio.gather(server, mqtt_server())
 
 asyncio.run(main())
