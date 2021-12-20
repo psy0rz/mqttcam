@@ -1,13 +1,12 @@
+import asyncio
+import json
+
 import asyncio_mqtt
 import picamera
-import asyncio
 
 import config
-
 import upload
 from log import log
-
-
 
 log("Starting mqttcam")
 
@@ -38,8 +37,8 @@ class CamServerProtocol(asyncio.Protocol):
 
 async def mqtt_server():
 
-    async def mqtt_error(text):
-        await client.publish(config.mqtt_topic + "error", text)
+    # async def mqtt_error(text):
+    #     await client.publish(config.mqtt_topic + "error", text)
 
 
     # handle mqtt stuff
@@ -72,8 +71,12 @@ async def mqtt_server():
                             camera.stop_recording()
 
                     elif message.topic.endswith("/upload"):
-                        log("Uploading")
-                        upload.upload()
+                        log("Uploading:")
+                        try:
+                            params=json.loads(message.payload.decode())
+                            upload.upload(**params)
+                        except Exception as e:
+                            log("Error: "+str(e))
                         # https://pypi.org/project/simple-youtube-api/
 
 async def main():
