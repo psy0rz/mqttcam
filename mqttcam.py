@@ -72,6 +72,8 @@ async def mqtt_server():
 
                     elif message.topic.endswith("/upload"):
                         log("Uploading:")
+                        if camera.recording:
+                            camera.stop_recording()
                         try:
                             params=json.loads(message.payload.decode())
                             upload.upload(**params)
