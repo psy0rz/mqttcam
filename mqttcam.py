@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 
 import asyncio_mqtt
 import picamera
@@ -14,6 +15,7 @@ camera = picamera.PiCamera()
 camera.resolution = (1920, 1080)
 camera.framerate = 30
 camera.annotate_background = True
+camera.annotate_text_size=40
 
 streaming=False
 
@@ -25,7 +27,7 @@ class CamServerProtocol(asyncio.Protocol):
         self.transport = transport
         global streaming
         streaming=True
-        camera.start_recording(transport, format='h264')
+        camera.start_recording(transport, format='h264', sei=True, intra_period=0)
 
     def connection_lost(self, exc):
         log('Viewer client disconnected: {}'.format(exc))
@@ -62,8 +64,9 @@ async def mqtt_server():
                 elif not streaming:
                     if message.topic.endswith("/start"):
                         if not camera.recording:
+                            file_name=config.upload_dir+"current.h264"
                             log("Started recording")
-                            camera.start_recording("/tmp/mqttcam.mp4", format='h264')
+                            camera.start_recording(file_name, format='h264', sei=True, intra_period=0)
 
                     elif message.topic.endswith("/stop"):
                         if camera.recording:
@@ -71,15 +74,18 @@ async def mqtt_server():
                             camera.stop_recording()
 
                     elif message.topic.endswith("/upload"):
-                        log("Uploading:")
+                        log("Moving video to upload dir")
                         if camera.recording:
                             camera.stop_recording()
                         try:
+
                             params=json.loads(message.payload.decode())
-                            upload.upload(**params)
+                            name=params['title']
+                            os.rename(config.upload_dir+"current.h264", config.upload_dir+name+".h264")
+                            with open(config.upload_dir+name+".meta","w") as fh:
+                                fh.write(message.payload.decode())
                         except Exception as e:
                             log("Error: "+str(e))
-                        # https://pypi.org/project/simple-youtube-api/
 
 async def main():
 
